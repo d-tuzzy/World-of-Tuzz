@@ -9,4 +9,13 @@ print("Waiting...")
 connection, address = server.accept()
 
 print("Connected!")
-print(connection.recv(1024).decode())
+
+while True:
+    message = connection.recv(1024).decode()
+    print(message)
+
+    if message == "ESC":
+        break
+
+connection.close()
+server.close()
