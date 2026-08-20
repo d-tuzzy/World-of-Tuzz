@@ -3,10 +3,13 @@ from socket import socket
 
 
 ip = input("IP: ")
+name = input("Name: ")
 
-def main(screen):
+def main(screen) -> None:
     client = socket()
     client.connect((ip, 5000)) # Connect to the server on port 5000
+
+    client.send(f"{name} has pulled up.".encode())
 
     curses.curs_set(0) # Hide terminal cursor
     screen.nodelay(True) # Make getch() non-blocking so the game keeps running
@@ -33,24 +36,24 @@ def main(screen):
             continue # No key pressed, start the loop again
 
         if key == 27: # Escape key
-            client.send(b"ESC") # Send "ESC" as bytes to the server
+            client.send(f"{name}: ESC".encode()) # Send "{name}:ESC" as bytes to the server
             break
 
         elif key == curses.KEY_UP:
             y -= 1
-            client.send(b"UP")
+            client.send(f"{name}: UP".encode())
 
         elif key == curses.KEY_DOWN:
             y += 1
-            client.send(b"DOWN")
+            client.send(f"{name}: DOWN".encode())
 
         elif key == curses.KEY_LEFT:
             x -= 2 # Move 2 spaces to match vertical movement
-            client.send(b"LEFT")
+            client.send(f"{name}: LEFT".encode())
 
         elif key == curses.KEY_RIGHT:
             x += 2
-            client.send(b"RIGHT")
+            client.send(f"{name}: RIGHT".encode())
 
     client.close()
 
