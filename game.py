@@ -4,7 +4,12 @@ import json
 from socket import socket
 from threading import Thread
 
-##### receive_messsages() and receive_thread will be used in the next commit for server-to-client communication
+
+ip = input("IP: ")
+name = input("Name: ")
+
+
+##### receive_messages() and receive_thread will be used in the next commit for server-to-client communication
 
 # def receive_messages(client: socket) -> None:
 #     """Receive and decode JSON messages from the connected server."""
@@ -34,9 +39,6 @@ def send_message(client: socket, name: str, message: str) -> None:
 
 
 def main(screen) -> None:
-    ip = input("IP: ")
-    name = input("Name: ")
-
     client = socket()
     client.connect((ip, 5000)) # Connect to the server on port 5000
 
