@@ -4,6 +4,9 @@ from socket import socket
 from threading import Thread
 
 
+clients = [] # List to store connected clients
+
+
 def handle_client(connection: socket) -> None:
     """Handle communication with a connected client."""
 
@@ -24,9 +27,17 @@ def handle_client(connection: socket) -> None:
 
             print(message) # FOR TESTING
 
+            for client in clients:
+                if client != connection:
+                    json_data = json.dumps(message) + "\n" # Convert dictionary to JSON string and mark the end
+                    encoded_data = json_data.encode() # Encode the JSON string to bytes
+
+                    client.send(encoded_data) # Send the encoded JSON message to the client
+                
             if message["message"] == "ESC":
                 running = False # Break out of the outer loop
 
+    clients.remove(connection) # Remove the client from the list
     connection.close() # Close the client connection
 
 
@@ -39,7 +50,8 @@ def main() -> None:
 
     while True:
         connection, address = server.accept() # Wait for a client and return its connection socket + address tuple
-        print("Connected!")
+
+        clients.append(connection)
 
         thread = Thread(
             target=handle_client, # The thread will run handle_client

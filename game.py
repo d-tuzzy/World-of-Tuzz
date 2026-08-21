@@ -8,20 +8,27 @@ from threading import Thread
 ip = input("IP: ")
 name = input("Name: ")
 
+messages = [] # List to store received messages
 
-##### receive_messages() and receive_thread will be used in the next commit for server-to-client communication
 
-# def receive_messages(client: socket) -> None:
-#     """Receive and decode JSON messages from the connected server."""
+def receive_messages(client: socket) -> None:
+    """Receive and decode JSON messages from the connected server."""
 
-#     while True:
-#         data = client.recv(1024) # Receive up to 1024 bytes
+    buffer = ""
 
-#         if not data: # If the server disconnects
-#             break
+    while True:
+        data = client.recv(1024) # Receive up to 1024 bytes
 
-#         message = json.loads(data.decode())  # Decode the JSON message from the server
-#         print(message) # FOR TESTING
+        if not data: # If the server disconnects
+            break
+
+        buffer += data.decode() # Append decoded data to the buffer
+
+        while "\n" in buffer: # While there is a complete message in the buffer
+            message, buffer = buffer.split("\n", 1) # Split the buffer into a complete message and the remaining buffer
+            message = json.loads(message) # Decode the JSON message from the server
+
+            messages.append(message)
 
 
 def send_message(client: socket, name: str, message: str) -> None:
@@ -42,11 +49,11 @@ def main(screen) -> None:
     client = socket()
     client.connect((ip, 5000)) # Connect to the server on port 5000
 
-    # receive_thread = Thread(
-    #     target=receive_messages, # The thread will run receive_messages
-    #     args=(client,) # Pass the client socket as the argument (in a single tuple)
-    # )
-    # receive_thread.start() # The thread will receive messages from the server independently
+    receive_thread = Thread(
+        target=receive_messages, # The thread will run receive_messages
+        args=(client,) # Pass the client socket as the argument (in a single tuple)
+    )
+    receive_thread.start() # The thread will receive messages from the server independently
 
     send_message(client, name, "JOIN")
 
@@ -66,6 +73,9 @@ def main(screen) -> None:
         game.box() # Draw a box around the window
         game.addstr(0, 2, " GAME ") # Add the game title
         game.addstr(y, x, "@") # Draw the player at their current position
+
+        for i, message in enumerate(messages): # Use the message index for the y-coordinate
+            game.addstr(i + 1, 2, str(message)) # FOR TESTING: Display received messages in the game window
 
         game.refresh() # Update the game window
 
