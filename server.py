@@ -7,17 +7,25 @@ from threading import Thread
 def handle_client(connection: socket) -> None:
     """Handle communication with a connected client."""
 
-    while True:
+    buffer = ""
+    running = True
+
+    while running:
         data = connection.recv(1024) # Receive up to 1024 bytes
 
         if not data: # If the client disconnects
             break
 
-        message = json.loads(data.decode()) # Decode the JSON message from the client
-        print(message)
+        buffer += data.decode() # Append decoded data to the buffer
 
-        if message["message"] == "ESC":
-            break
+        while "\n" in buffer: # While there is a complete message in the buffer
+            message, buffer = buffer.split("\n", 1) # Split the buffer into a complete message and the remaining buffer
+            message = json.loads(message) # Decode the JSON message from the client
+
+            print(message) # FOR TESTING
+
+            if message["message"] == "ESC":
+                running = False # Break out of the outer loop
 
     connection.close() # Close the client connection
 

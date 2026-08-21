@@ -32,7 +32,7 @@ def send_message(client: socket, name: str, message: str) -> None:
         "message": message
     }
 
-    json_data = json.dumps(data) # Convert the dictionary to a JSON string
+    json_data = json.dumps(data) + "\n" # Convert dictionary to JSON string and mark the end
     encoded_data = json_data.encode() # Encode the JSON string to bytes
 
     client.send(encoded_data) # Send the encoded JSON message to the server
