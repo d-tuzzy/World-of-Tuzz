@@ -1,3 +1,5 @@
+import json
+
 from socket import socket
 from threading import Thread
 
@@ -7,10 +9,14 @@ def handle_client(connection: socket) -> None:
 
     while True:
         data = connection.recv(1024) # Receive up to 1024 bytes
-        message = data.decode() # Convert the bytes into text
+
+        if not data: # If the client disconnects
+            break
+
+        message = json.loads(data.decode()) # Decode the JSON message from the client
         print(message)
 
-        if message.endswith(": ESC"):
+        if message["message"] == "ESC":
             break
 
     connection.close() # Close the client connection

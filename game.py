@@ -1,15 +1,52 @@
 import curses
+import json
+
 from socket import socket
+from threading import Thread
+
+##### receive_messsages() and receive_thread will be used in the next commit for server-to-client communication
+
+# def receive_messages(client: socket) -> None:
+#     """Receive and decode JSON messages from the connected server."""
+
+#     while True:
+#         data = client.recv(1024) # Receive up to 1024 bytes
+
+#         if not data: # If the server disconnects
+#             break
+
+#         message = json.loads(data.decode())  # Decode the JSON message from the server
+#         print(message) # FOR TESTING
 
 
-ip = input("IP: ")
-name = input("Name: ")
+def send_message(client: socket, name: str, message: str) -> None:
+    """Send a JSON message to the server."""
+
+    data = {
+        "name": name,
+        "message": message
+    }
+
+    json_data = json.dumps(data) # Convert the dictionary to a JSON string
+    encoded_data = json_data.encode() # Encode the JSON string to bytes
+
+    client.send(encoded_data) # Send the encoded JSON message to the server
+
 
 def main(screen) -> None:
+    ip = input("IP: ")
+    name = input("Name: ")
+
     client = socket()
     client.connect((ip, 5000)) # Connect to the server on port 5000
 
-    client.send(f"{name} has pulled up.".encode())
+    # receive_thread = Thread(
+    #     target=receive_messages, # The thread will run receive_messages
+    #     args=(client,) # Pass the client socket as the argument (in a single tuple)
+    # )
+    # receive_thread.start() # The thread will receive messages from the server independently
+
+    send_message(client, name, "JOIN")
 
     curses.curs_set(0) # Hide terminal cursor
     screen.nodelay(True) # Make getch() non-blocking so the game keeps running
@@ -36,24 +73,24 @@ def main(screen) -> None:
             continue # No key pressed, start the loop again
 
         if key == 27: # Escape key
-            client.send(f"{name}: ESC".encode()) # Send "{name}:ESC" as bytes to the server
+            send_message(client, name, "ESC")
             break
 
         elif key == curses.KEY_UP:
             y -= 1
-            client.send(f"{name}: UP".encode())
+            send_message(client, name, "UP")
 
         elif key == curses.KEY_DOWN:
             y += 1
-            client.send(f"{name}: DOWN".encode())
+            send_message(client, name, "DOWN")
 
         elif key == curses.KEY_LEFT:
             x -= 2 # Move 2 spaces to match vertical movement
-            client.send(f"{name}: LEFT".encode())
+            send_message(client, name, "LEFT")
 
         elif key == curses.KEY_RIGHT:
             x += 2
-            client.send(f"{name}: RIGHT".encode())
+            send_message(client, name, "RIGHT")
 
     client.close()
 
