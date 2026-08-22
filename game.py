@@ -1,8 +1,8 @@
 import curses
-import json
 
 from socket import socket
 from threading import Thread
+from messenger import Messenger
 
 
 ip = input("IP: ")
@@ -11,51 +11,18 @@ name = input("Name: ")
 messages = [] # List to store received messages
 
 
-def receive_messages(client: socket) -> None:
-    """Receive and decode JSON messages from the connected server."""
-
-    buffer = ""
-
-    while True:
-        data = client.recv(1024) # Receive up to 1024 bytes
-
-        if not data: # If the server disconnects
-            break
-
-        buffer += data.decode() # Append decoded data to the buffer
-
-        while "\n" in buffer: # While there is a complete message in the buffer
-            message, buffer = buffer.split("\n", 1) # Split the buffer into a complete message and the remaining buffer
-            message = json.loads(message) # Decode the JSON message from the server
-
-            messages.append(message)
-
-
-def send_message(client: socket, name: str, message: str) -> None:
-    """Send a JSON message to the server."""
-
-    data = {
-        "name": name,
-        "message": message
-    }
-
-    json_data = json.dumps(data) + "\n" # Convert dictionary to JSON string and mark the end
-    encoded_data = json_data.encode() # Encode the JSON string to bytes
-
-    client.send(encoded_data) # Send the encoded JSON message to the server
-
-
 def main(screen) -> None:
     client = socket()
     client.connect((ip, 5000)) # Connect to the server on port 5000
+    messenger = Messenger(client) # Create a Messenger for this client
 
     receive_thread = Thread(
-        target=receive_messages, # The thread will run receive_messages
-        args=(client,) # Pass the client socket as the argument (in a single tuple)
+        target=messenger.receive_messages,
+        args=(messages,)
     )
-    receive_thread.start() # The thread will receive messages from the server independently
+    receive_thread.start() # The thread will run independently and continuously receive messages from the server
 
-    send_message(client, name, "JOIN")
+    messenger.send_message(name, "JOIN")
 
     curses.curs_set(0) # Hide terminal cursor
     screen.nodelay(True) # Make getch() non-blocking so the game keeps running
@@ -85,24 +52,24 @@ def main(screen) -> None:
             continue # No key pressed, start the loop again
 
         if key == 27: # Escape key
-            send_message(client, name, "ESC")
+            messenger.send_message(name, "ESC")
             break
 
         elif key == curses.KEY_UP:
             y -= 1
-            send_message(client, name, "UP")
+            messenger.send_message(name, "UP")
 
         elif key == curses.KEY_DOWN:
             y += 1
-            send_message(client, name, "DOWN")
+            messenger.send_message(name, "DOWN")
 
         elif key == curses.KEY_LEFT:
             x -= 2 # Move 2 spaces to match vertical movement
-            send_message(client, name, "LEFT")
+            messenger.send_message(name, "LEFT")
 
         elif key == curses.KEY_RIGHT:
             x += 2
-            send_message(client, name, "RIGHT")
+            messenger.send_message(name, "RIGHT")
 
     client.close()
 
