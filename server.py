@@ -21,7 +21,8 @@ class Server:
             if messenger.connection != sender: # Ignore the sender
                 messenger.send_message(
                     message["name"], # Use the name from the dictionary
-                    message["message"] # Use the message from the dictionary
+                    message["type"], # Use the message type from the dictionary
+                    message["data"]  # Use the data from the dictionary
                 )
 
     def handle_client(self, messenger: Messenger) -> None:
@@ -37,7 +38,7 @@ class Server:
             print(message) # FOR TESTING
             self.broadcast_message(message, sender=connection)
 
-            if message["message"] == "ESC": # If the client has sent an ESC message
+            if message["type"] == "leave": # If the client has sent a leave message
                 break
 
         self.client_messengers.remove(messenger) # Remove the client from the list

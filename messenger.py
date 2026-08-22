@@ -11,17 +11,18 @@ class Messenger:
         self.connection = connection
         self.buffer = "" # Stores incomplete messages until a full message is received
 
-    def send_message(self, name: str, message: str) -> None:
+    def send_message(self, name: str, message_type: str, data: str) -> None:
         """Send a JSON message."""
-        data = {
+        message = {
             "name": name,
-            "message": message
+            "type": message_type,
+            "data": data
         }
 
-        json_data = json.dumps(data) + "\n" # Convert dictionary to JSON string and mark the end
-        encoded_data = json_data.encode() # Encode the JSON string to UTF-8 bytes
+        json_message = json.dumps(message) + "\n" # Convert dictionary to JSON string and mark the end
+        encoded_message = json_message.encode() # Encode the JSON string to UTF-8 bytes
 
-        self.connection.send(encoded_data)
+        self.connection.send(encoded_message)
 
     def receive_message(self) -> dict:
         """Receive and decode one JSON message."""

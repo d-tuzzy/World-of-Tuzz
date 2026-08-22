@@ -16,23 +16,24 @@ def main(screen) -> None:
     client.connect((ip, 5000)) # Connect to the server on port 5000
     messenger = Messenger(client) # Create a Messenger for this client
 
-    receive_thread = Thread(
+    thread = Thread(
         target=messenger.receive_messages,
         args=(messages,)
     )
-    receive_thread.start() # The thread will run independently and continuously receive messages from the server
+    thread.start() # The thread will run independently and continuously receive messages from the server
 
-    messenger.send_message(name, "JOIN")
+    messenger.send_message(name, "join", "")
 
     curses.curs_set(0) # Hide terminal cursor
     screen.nodelay(True) # Make getch() non-blocking so the game keeps running
 
     height, width = screen.getmaxyx() # Get the size of the terminal
-
     game = curses.newwin(height, width, 0, 0) # Create the game window
 
     x = width // 2 # Start the player in the middle of the window
-    y = height // 2 
+    y = height // 2
+    chat_mode = False
+    chat_input = ""
 
     while True:
         game.clear()
@@ -44,6 +45,9 @@ def main(screen) -> None:
         for i, message in enumerate(messages): # Use the message index for the y-coordinate
             game.addstr(i + 1, 2, str(message)) # FOR TESTING: Display received messages in the game window
 
+        if chat_mode:
+            game.addstr(height - 2, 2, f"> {chat_input}") # Show the message being typed
+
         game.refresh() # Update the game window
 
         key = screen.getch() # Check for keyboard input (-1 if none)
@@ -51,25 +55,46 @@ def main(screen) -> None:
         if key == -1:
             continue # No key pressed, start the loop again
 
-        if key == 27: # Escape key
-            messenger.send_message(name, "ESC")
-            break
+        if key == 27: # Escape key - used to leave chat mode or exit the game
+            if chat_mode:
+                chat_mode = False # Exit chat mode
+                chat_input = "" # Clear the message being typed
+            else:
+                messenger.send_message(name, "leave", "")
+                break
+
+        elif key == ord("/"):
+            chat_mode = True
+
+        elif chat_mode: # Handle keyboard input while in chat mode
+            if key in (curses.KEY_ENTER, 10, 13): # Handle different key codes used by different terminals
+                if chat_input: # Only send the message if it contains text
+                    messenger.send_message(name, "chat", chat_input)
+                    chat_input = "" # Clear the input after sending
+                chat_mode = False
+
+            elif key in (curses.KEY_BACKSPACE, 8, 127): # Handle different key codes used by different terminals
+                chat_input = chat_input[:-1] # Remove the last character from the input
+
+            elif (32 <= key <= 126): # Only add printable characters to the input
+                chat_input += chr(key)
+
 
         elif key == curses.KEY_UP:
             y -= 1
-            messenger.send_message(name, "UP")
+            messenger.send_message(name, "move", "up")
 
         elif key == curses.KEY_DOWN:
             y += 1
-            messenger.send_message(name, "DOWN")
+            messenger.send_message(name, "move", "down")
 
         elif key == curses.KEY_LEFT:
             x -= 2 # Move 2 spaces to match vertical movement
-            messenger.send_message(name, "LEFT")
+            messenger.send_message(name, "move", "left")
 
         elif key == curses.KEY_RIGHT:
             x += 2
-            messenger.send_message(name, "RIGHT")
+            messenger.send_message(name, "move", "right")
 
     client.close()
 
