@@ -9,6 +9,7 @@ class Server:
     def __init__(self) -> None:
         """Initialise the Server with a server socket and its connected clients."""
         self.socket = socket()
+        self.players = {} # Coordinates of all other players
 
         # Each client has a Messenger that stores its connection and buffer.
         # Storing Messengers (instead of just the connections) lets us identify clients while reusing the same Messenger.
@@ -34,6 +35,12 @@ class Server:
 
             if not message: # If the client has disconnected
                 break # Break before broadcasting so the other clients don't get a blank message
+
+            if message["type"] == "position": # If a player has sent a position message
+                name = message["name"]
+                position = message["data"]
+
+                self.players[name] = position # Store the new position
 
             print(message) # FOR TESTING
             self.broadcast_message(message, sender=connection)

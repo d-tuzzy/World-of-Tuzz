@@ -36,19 +36,3 @@ class Messenger:
 
         message, self.buffer = self.buffer.split("\n", 1) # Split the buffer into a complete message and the remaining buffer
         return json.loads(message) # Parse the JSON string into a dictionary and return it
-
-    def receive_messages(self, messages: list[dict]) -> None:
-        """Continuously receive and store JSON messages."""
-        while True:
-            data = self.connection.recv(1024) # Receive up to 1024 bytes
-
-            if not data: # If the client disconnects
-                break
-
-            self.buffer += data.decode() # Append decoded data to the buffer
-
-            while "\n" in self.buffer: # Process every complete message currently in the buffer
-                message, self.buffer = self.buffer.split("\n", 1) # Split the buffer into a complete message and the remaining buffer
-
-                message = json.loads(message) # Parse the JSON string into a dictionary
-                messages.append(message)

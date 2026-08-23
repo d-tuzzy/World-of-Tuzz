@@ -18,10 +18,10 @@ class Game:
         self.ip = ip
         self.name = name
 
-        # Network and received messages
-        self.messages = []
+        # Network and received chats
         self.client = socket()
         self.messenger = Messenger(self.client)
+        self.chats = []
 
         # World
         self.world_width = 300
@@ -34,6 +34,9 @@ class Game:
         # Camera position within the world (top-left corner)
         self.camera_x = 0
         self.camera_y = 0
+
+        # Coordinates of all other players within the world
+        self.players = {}
 
         # Chat
         self.chat_mode = False
@@ -48,13 +51,27 @@ class Game:
         """Connect to the server and start receiving messages."""
         self.client.connect((self.ip, 5000)) # Connect to the server on port 5000
 
-        thread = Thread(
-            target=self.messenger.receive_messages,
-            args=(self.messages,)
-        )
+        thread = Thread(target=self.receive_messages)
         thread.start() # The thread will run independently and continuously receive messages from the server
 
         self.messenger.send_message(self.name, "join", "")
+
+    def receive_messages(self) -> None:
+        """Continuously receive and process JSON messages."""
+        while True:
+            message = self.messenger.receive_message()
+
+            if not message:
+                break
+
+            if message["type"] == "position": # If a player has sent a position message
+                name = message["name"]
+                position = message["data"]
+
+                self.players[name] = position # Store the new position
+
+            elif message["type"] == "chat":
+                self.chats.append(message)
 
     def setup(self) -> None:
         """Set up the game screen."""
@@ -108,11 +125,11 @@ class Game:
             if 1 <= player_y < self.height - 1:
                 self.game.addstr(player_y, player_x, "@")
 
-        for i, message in enumerate(self.messages): # Use the message index for the y-coordinate
+        for i, chat in enumerate(self.chats): # Use the message index for the y-coordinate
             self.game.addstr(
                 i + 1,
                 2,
-                str(message)
+                str(chat)
             ) # FOR TESTING: Display received messages in the game window
 
         if self.chat_mode:
@@ -173,41 +190,27 @@ class Game:
         """Handle movement keys."""
         if key == curses.KEY_UP:
             self.y -= 1
-            self.messenger.send_message(
-                self.name,
-                "move",
-                "up"
-            )
 
         elif key == curses.KEY_DOWN:
             self.y += 1
-            self.messenger.send_message(
-                self.name,
-                "move",
-                "down"
-            )
 
         elif key == curses.KEY_LEFT:
             self.x -= 2 # Move 2 spaces to match vertical movement
-            self.messenger.send_message(
-                self.name,
-                "move",
-                "left"
-            )
 
         elif key == curses.KEY_RIGHT:
             self.x += 2
-            self.messenger.send_message(
-                self.name,
-                "move",
-                "right"
-            )
 
         # Keep the player's X position between 1 and world_width - 2.
         self.x = max(1, min(self.x, self.world_width - 2))
-
+        
         # Keep the player's Y position between 1 and world_height - 2.
         self.y = max(1, min(self.y, self.world_height - 2))
+
+        self.messenger.send_message(
+            self.name,
+            "position",
+            (self.x, self.y)
+        )
 
     def run(self) -> None:
         """Run the game loop."""
