@@ -15,7 +15,6 @@ class Game:
     def __init__(self, screen) -> None:
         """Initialise the game client and its attributes."""
         self.screen = screen
-
         self.ip = ip
         self.name = name
 
@@ -24,9 +23,17 @@ class Game:
         self.client = socket()
         self.messenger = Messenger(self.client)
 
-        # Player position
+        # World
+        self.world_width = 300
+        self.world_height = 100
+
+        # Player position within the world
         self.x = 0
         self.y = 0
+
+        # Camera position within the world (top-left corner)
+        self.camera_x = 0
+        self.camera_y = 0
 
         # Chat
         self.chat_mode = False
@@ -62,16 +69,44 @@ class Game:
             0
         ) # Create the game window
 
-        self.x = self.width // 2 # Start the player in the middle of the window
-        self.y = self.height // 2
+        # Start the player in the middle of the world
+        self.x = self.world_width // 2
+        self.y = self.world_height // 2
+
+    def update_camera(self) -> None:
+        """Update the camera to follow the player."""
+        # Position the camera so the player is in the middle of the screen
+        self.camera_x = self.x - self.width // 2
+        self.camera_y = self.y - self.height // 2
+
+        # Keep the camera's X position inside the world
+        # The camera cannot go below 0 or beyond the world's right edge
+        self.camera_x = max(
+            0,
+            min(self.camera_x, self.world_width - self.width)
+        )
+
+        # Keep the camera's Y position inside the world
+        # The camera cannot go below 0 or beyond the world's bottom edge
+        self.camera_y = max(
+            0,
+            min(self.camera_y, self.world_height - self.height)
+        )
 
     def draw(self) -> None:
         """Draw the game."""
         self.game.clear()
         self.game.box() # Draw a box around the window
         self.game.addstr(0, 2, " GAME ") # Add the game title
-        self.game.addstr(self.y, self.x, "@") # Draw the player at their current position
 
+        # Player coordinates within the screen
+        player_x = self.x - self.camera_x
+        player_y = self.y - self.camera_y
+
+        # Only draw the player if they are visible in the window
+        if 1 <= player_x < self.width - 1:
+            if 1 <= player_y < self.height - 1:
+                self.game.addstr(player_y, player_x, "@")
 
         for i, message in enumerate(self.messages): # Use the message index for the y-coordinate
             self.game.addstr(
@@ -117,21 +152,21 @@ class Game:
 
     def handle_chat_key(self, key: int) -> None:
         """Handle a key press while in chat mode."""
-        if key in (curses.KEY_ENTER, 10, 13):  # Handle different key codes used by different terminals
-            if self.chat_input:  # Only send the message if it contains text
+        if key in (curses.KEY_ENTER, 10, 13): # Handle different key codes used by different terminals
+            if self.chat_input: # Only send the message if it contains text
                 self.messenger.send_message(
                     self.name,
                     "chat",
                     self.chat_input
                 )
-                self.chat_input = ""  # Clear the input after sending
+                self.chat_input = "" # Clear the input after sending
 
             self.chat_mode = False
 
-        elif key in (curses.KEY_BACKSPACE, 8, 127):  # Handle different key codes used by different terminals
-            self.chat_input = self.chat_input[:-1]  # Remove the last character from the input
+        elif key in (curses.KEY_BACKSPACE, 8, 127): # Handle different key codes used by different terminals
+            self.chat_input = self.chat_input[:-1] # Remove the last character from the input
 
-        elif 32 <= key <= 126:  # Only add printable characters to the input
+        elif 32 <= key <= 126: # Only add printable characters to the input
             self.chat_input += chr(key)
 
     def handle_movement(self, key: int) -> None:
@@ -153,7 +188,7 @@ class Game:
             )
 
         elif key == curses.KEY_LEFT:
-            self.x -= 2  # Move 2 spaces to match vertical movement
+            self.x -= 2 # Move 2 spaces to match vertical movement
             self.messenger.send_message(
                 self.name,
                 "move",
@@ -168,18 +203,25 @@ class Game:
                 "right"
             )
 
+        # Keep the player's X position between 1 and world_width - 2.
+        self.x = max(1, min(self.x, self.world_width - 2))
+
+        # Keep the player's Y position between 1 and world_height - 2.
+        self.y = max(1, min(self.y, self.world_height - 2))
+
     def run(self) -> None:
         """Run the game loop."""
         self.connect()
         self.setup()
 
         while True:
+            self.update_camera()
             self.draw()
 
-            key = self.screen.getch()  # Check for keyboard input (-1 if none)
+            key = self.screen.getch() # Check for keyboard input (-1 if none)
 
             if key == -1:
-                continue  # No key pressed, start the loop again
+                continue # No key pressed, start the loop again
 
             if not self.handle_key(key):
                 break
@@ -193,4 +235,4 @@ def main(screen) -> None:
     game.run()
 
 
-curses.wrapper(main)  # Start the game and handle terminal cleanup afterwards
+curses.wrapper(main) # Start the game and handle terminal cleanup afterwards
