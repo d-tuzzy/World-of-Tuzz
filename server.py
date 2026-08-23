@@ -9,7 +9,7 @@ class Server:
     def __init__(self) -> None:
         """Initialise the Server with a server socket and its connected clients."""
         self.socket = socket()
-        self.players = {} # Coordinates of all other players
+        self.player_coords = {} # Coordinates of all players
 
         # Each client has a Messenger that stores its connection and buffer.
         # Storing Messengers (instead of just the connections) lets us identify clients while reusing the same Messenger.
@@ -40,12 +40,18 @@ class Server:
                 name = message["name"]
                 position = message["data"]
 
-                self.players[name] = position # Store the new position
+                self.player_coords[name] = position # Store the new position
+
+            elif message["type"] == "join": # If a player has sent a join message
+                # Send existing player positions to the new player
+                for name, position in self.player_coords.items():
+                    messenger.send_message(name, "position", position)
 
             print(message) # FOR TESTING
             self.broadcast_message(message, sender=connection)
 
             if message["type"] == "leave": # If the client has sent a leave message
+                del self.player_coords[message["name"]] # Remove the player from the list of players
                 break
 
         self.client_messengers.remove(messenger) # Remove the client from the list
@@ -68,7 +74,7 @@ class Server:
                 target=self.handle_client, # The thread will run handle_client
                 args=(messenger,) # Pass the client's Messenger as the argument (in a single tuple)
             )
-            thread.start() # The thread for this player will run separately from the main thread.
+            thread.start() # The thread for this player will run separately from the main thread
 
 
 if __name__ == "__main__":

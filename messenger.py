@@ -34,7 +34,7 @@ class Messenger:
         while "\n" not in self.buffer: # Keep receiving until a complete message is in the buffer
             try:
                 data = self.connection.recv(1024) # Receive up to 1024 bytes
-            except (ConnectionResetError, ConnectionAbortedError): # Handle the connection being forcibly closed
+            except (ConnectionResetError, ConnectionAbortedError, OSError): # If the connection is closed or reset, return an empty dictionary
                 return {}
 
             if not data: # If the client disconnects

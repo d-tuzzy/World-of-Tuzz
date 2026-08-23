@@ -36,7 +36,7 @@ class Game:
         self.camera_y = 0
 
         # Coordinates of all other players within the world
-        self.players = {}
+        self.player_coords = {}
 
         # Chat
         self.chat_mode = False
@@ -68,10 +68,13 @@ class Game:
                 name = message["name"]
                 position = message["data"]
 
-                self.players[name] = position # Store the new position
+                self.player_coords[name] = position # Store the new position
 
             elif message["type"] == "chat":
                 self.chats.append(message)
+
+            elif message["type"] == "leave":
+                del self.player_coords[message["name"]] # Remove the player from the list of players
 
     def setup(self) -> None:
         """Set up the game screen."""
@@ -126,6 +129,15 @@ class Game:
         if 1 <= player_x < self.width - 1:
             if 1 <= player_y < self.height - 1:
                 self.game.addstr(player_y, player_x, "@")
+
+        for name, position in self.player_coords.items():
+            # Since the player has already been drawn, player_x and player_y are reused for other players
+            player_x = position[0] - self.camera_x
+            player_y = position[1] - self.camera_y
+
+            if 1 <= player_x < self.width - 1:
+                if 1 <= player_y < self.height - 1:
+                    self.game.addstr(player_y, player_x, "#")
 
         for i, chat in enumerate(self.chats): # Use the message index for the y-coordinate
             self.game.addstr(
@@ -223,6 +235,11 @@ class Game:
         """Run the game loop."""
         self.connect()
         self.setup()
+        self.messenger.send_message(
+            self.name,
+            "position",
+            (self.x, self.y)
+        ) # Send the initial position so that existing players can see the new player
 
         while True:
             self.update_camera()
@@ -236,6 +253,7 @@ class Game:
             if not self.handle_key(key):
                 break
 
+        self.client.shutdown(1) # Shutdown the socket for sending data
         self.client.close()
 
 
