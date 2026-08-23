@@ -11,7 +11,12 @@ class Messenger:
         self.connection = connection
         self.buffer = "" # Stores incomplete messages until a full message is received
 
-    def send_message(self, name: str, message_type: str, data: str) -> None:
+    def send_message(
+            self,
+            name: str,
+            message_type: str,
+            data: str | tuple[int, int] # Can be a string or a tuple of two integers (coordinates)
+        ) -> None:
         """Send a JSON message."""
         message = {
             "name": name,

@@ -112,6 +112,8 @@ class Game:
 
     def draw(self) -> None:
         """Draw the game."""
+        assert self.game is not None # Keeps PyLance happy
+        
         self.game.clear()
         self.game.box() # Draw a box around the window
         self.game.addstr(0, 2, " GAME ") # Add the game title
@@ -188,6 +190,8 @@ class Game:
 
     def handle_movement(self, key: int) -> None:
         """Handle movement keys."""
+        old_position = (self.x, self.y)
+
         if key == curses.KEY_UP:
             self.y -= 1
 
@@ -206,11 +210,14 @@ class Game:
         # Keep the player's Y position between 1 and world_height - 2.
         self.y = max(1, min(self.y, self.world_height - 2))
 
-        self.messenger.send_message(
-            self.name,
-            "position",
-            (self.x, self.y)
-        )
+        new_position = (self.x, self.y)
+
+        if new_position != old_position: # Prevents sending position messages when bumped against world boundary
+            self.messenger.send_message(
+                self.name,
+                "position",
+                new_position
+            )
 
     def run(self) -> None:
         """Run the game loop."""
