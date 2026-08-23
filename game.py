@@ -158,7 +158,7 @@ class Game:
         return True
 
     def handle_escape(self) -> bool:
-        """Handle Escape."""
+        """Exit chat mode or close the game."""
         if self.chat_mode:
             self.chat_mode = False
             self.chat_input = ""

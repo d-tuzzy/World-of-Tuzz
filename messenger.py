@@ -27,7 +27,10 @@ class Messenger:
     def receive_message(self) -> dict:
         """Receive and decode one JSON message."""
         while "\n" not in self.buffer: # Keep receiving until a complete message is in the buffer
-            data = self.connection.recv(1024) # Receive up to 1024 bytes
+            try:
+                data = self.connection.recv(1024) # Receive up to 1024 bytes
+            except (ConnectionResetError, ConnectionAbortedError): # Handle the connection being forcibly closed
+                return {}
 
             if not data: # If the client disconnects
                 return {}
