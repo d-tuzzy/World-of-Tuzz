@@ -8,94 +8,189 @@ from messenger import Messenger
 ip = input("IP: ")
 name = input("Name: ")
 
-messages = [] # List to store received messages
+
+class Game:
+    """Handle the game client."""
+
+    def __init__(self, screen) -> None:
+        """Initialise the game client and its attributes."""
+        self.screen = screen
+
+        self.ip = ip
+        self.name = name
+
+        # Network and received messages
+        self.messages = []
+        self.client = socket()
+        self.messenger = Messenger(self.client)
+
+        # Player position
+        self.x = 0
+        self.y = 0
+
+        # Chat
+        self.chat_mode = False
+        self.chat_input = ""
+
+        # Terminal and game window
+        self.height = 0
+        self.width = 0
+        self.game = None
+
+    def connect(self) -> None:
+        """Connect to the server and start receiving messages."""
+        self.client.connect((self.ip, 5000)) # Connect to the server on port 5000
+
+        thread = Thread(
+            target=self.messenger.receive_messages,
+            args=(self.messages,)
+        )
+        thread.start() # The thread will run independently and continuously receive messages from the server
+
+        self.messenger.send_message(self.name, "join", "")
+
+    def setup(self) -> None:
+        """Set up the game screen."""
+        curses.curs_set(0) # Hide terminal cursor
+        self.screen.nodelay(True) # Make getch() non-blocking so the game keeps running
+
+        self.height, self.width = self.screen.getmaxyx() # Get the size of the terminal
+        self.game = curses.newwin(
+            self.height,
+            self.width,
+            0,
+            0
+        ) # Create the game window
+
+        self.x = self.width // 2 # Start the player in the middle of the window
+        self.y = self.height // 2
+
+    def draw(self) -> None:
+        """Draw the game."""
+        self.game.clear()
+        self.game.box() # Draw a box around the window
+        self.game.addstr(0, 2, " GAME ") # Add the game title
+        self.game.addstr(self.y, self.x, "@") # Draw the player at their current position
+
+
+        for i, message in enumerate(self.messages): # Use the message index for the y-coordinate
+            self.game.addstr(
+                i + 1,
+                2,
+                str(message)
+            ) # FOR TESTING: Display received messages in the game window
+
+        if self.chat_mode:
+            self.game.addstr(
+                self.height - 2,
+                2,
+                f"> {self.chat_input}"
+            ) # Show the message being typed
+
+        self.game.refresh() # Update the game window
+
+    def handle_key(self, key: int) -> bool:
+        """Handle a key press and return whether the game should continue."""
+        if key == 27:
+            return self.handle_escape()
+
+        if key == ord("/"):
+            self.chat_mode = True
+            return True
+
+        if self.chat_mode:
+            self.handle_chat_key(key)
+            return True
+
+        self.handle_movement(key)
+        return True
+
+    def handle_escape(self) -> bool:
+        """Handle Escape."""
+        if self.chat_mode:
+            self.chat_mode = False
+            self.chat_input = ""
+            return True
+
+        self.messenger.send_message(self.name, "leave", "")
+        return False
+
+    def handle_chat_key(self, key: int) -> None:
+        """Handle a key press while in chat mode."""
+        if key in (curses.KEY_ENTER, 10, 13):  # Handle different key codes used by different terminals
+            if self.chat_input:  # Only send the message if it contains text
+                self.messenger.send_message(
+                    self.name,
+                    "chat",
+                    self.chat_input
+                )
+                self.chat_input = ""  # Clear the input after sending
+
+            self.chat_mode = False
+
+        elif key in (curses.KEY_BACKSPACE, 8, 127):  # Handle different key codes used by different terminals
+            self.chat_input = self.chat_input[:-1]  # Remove the last character from the input
+
+        elif 32 <= key <= 126:  # Only add printable characters to the input
+            self.chat_input += chr(key)
+
+    def handle_movement(self, key: int) -> None:
+        """Handle movement keys."""
+        if key == curses.KEY_UP:
+            self.y -= 1
+            self.messenger.send_message(
+                self.name,
+                "move",
+                "up"
+            )
+
+        elif key == curses.KEY_DOWN:
+            self.y += 1
+            self.messenger.send_message(
+                self.name,
+                "move",
+                "down"
+            )
+
+        elif key == curses.KEY_LEFT:
+            self.x -= 2  # Move 2 spaces to match vertical movement
+            self.messenger.send_message(
+                self.name,
+                "move",
+                "left"
+            )
+
+        elif key == curses.KEY_RIGHT:
+            self.x += 2
+            self.messenger.send_message(
+                self.name,
+                "move",
+                "right"
+            )
+
+    def run(self) -> None:
+        """Run the game loop."""
+        self.connect()
+        self.setup()
+
+        while True:
+            self.draw()
+
+            key = self.screen.getch()  # Check for keyboard input (-1 if none)
+
+            if key == -1:
+                continue  # No key pressed, start the loop again
+
+            if not self.handle_key(key):
+                break
+
+        self.client.close()
 
 
 def main(screen) -> None:
-    client = socket()
-    client.connect((ip, 5000)) # Connect to the server on port 5000
-    messenger = Messenger(client) # Create a Messenger for this client
-
-    thread = Thread(
-        target=messenger.receive_messages,
-        args=(messages,)
-    )
-    thread.start() # The thread will run independently and continuously receive messages from the server
-
-    messenger.send_message(name, "join", "")
-
-    curses.curs_set(0) # Hide terminal cursor
-    screen.nodelay(True) # Make getch() non-blocking so the game keeps running
-
-    height, width = screen.getmaxyx() # Get the size of the terminal
-    game = curses.newwin(height, width, 0, 0) # Create the game window
-
-    x = width // 2 # Start the player in the middle of the window
-    y = height // 2
-    chat_mode = False
-    chat_input = ""
-
-    while True:
-        game.clear()
-
-        game.box() # Draw a box around the window
-        game.addstr(0, 2, " GAME ") # Add the game title
-        game.addstr(y, x, "@") # Draw the player at their current position
-
-        for i, message in enumerate(messages): # Use the message index for the y-coordinate
-            game.addstr(i + 1, 2, str(message)) # FOR TESTING: Display received messages in the game window
-
-        if chat_mode:
-            game.addstr(height - 2, 2, f"> {chat_input}") # Show the message being typed
-
-        game.refresh() # Update the game window
-
-        key = screen.getch() # Check for keyboard input (-1 if none)
-
-        if key == -1:
-            continue # No key pressed, start the loop again
-
-        if key == 27: # Escape key - used to leave chat mode or exit the game
-            if chat_mode:
-                chat_mode = False # Exit chat mode
-                chat_input = "" # Clear the message being typed
-            else:
-                messenger.send_message(name, "leave", "")
-                break
-
-        elif key == ord("/"):
-            chat_mode = True
-
-        elif chat_mode: # Handle keyboard input while in chat mode
-            if key in (curses.KEY_ENTER, 10, 13): # Handle different key codes used by different terminals
-                if chat_input: # Only send the message if it contains text
-                    messenger.send_message(name, "chat", chat_input)
-                    chat_input = "" # Clear the input after sending
-                chat_mode = False
-
-            elif key in (curses.KEY_BACKSPACE, 8, 127): # Handle different key codes used by different terminals
-                chat_input = chat_input[:-1] # Remove the last character from the input
-
-            elif (32 <= key <= 126): # Only add printable characters to the input
-                chat_input += chr(key)
+    """Start the game."""
+    game = Game(screen)
+    game.run()
 
 
-        elif key == curses.KEY_UP:
-            y -= 1
-            messenger.send_message(name, "move", "up")
-
-        elif key == curses.KEY_DOWN:
-            y += 1
-            messenger.send_message(name, "move", "down")
-
-        elif key == curses.KEY_LEFT:
-            x -= 2 # Move 2 spaces to match vertical movement
-            messenger.send_message(name, "move", "left")
-
-        elif key == curses.KEY_RIGHT:
-            x += 2
-            messenger.send_message(name, "move", "right")
-
-    client.close()
-
-curses.wrapper(main) # Start the game and handle terminal cleanup afterwards
+curses.wrapper(main)  # Start the game and handle terminal cleanup afterwards
