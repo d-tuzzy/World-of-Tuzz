@@ -18,10 +18,10 @@ class Game:
         self.ip = ip
         self.name = name
 
-        # Network and received chats
+        # Network and received messages
         self.client = socket()
         self.messenger = Messenger(self.client)
-        self.chats = []
+        self.messages = []
 
         # World
         self.world_width = 300
@@ -70,10 +70,11 @@ class Game:
 
                 self.player_coords[name] = position # Store the new position
 
-            elif message["type"] == "chat":
-                self.chats.append(message)
+            elif message["type"] in ("chat", "join"): # If a player has sent a chat or join message
+                self.messages.append(message)
 
             elif message["type"] == "leave":
+                self.messages.append(message)
                 del self.player_coords[message["name"]] # Remove the player from the list of players
 
     def setup(self) -> None:
@@ -139,7 +140,7 @@ class Game:
                 if 1 <= player_y < self.height - 1:
                     self.game.addstr(player_y, player_x, "#")
 
-        for i, chat in enumerate(self.chats): # Use the message index for the y-coordinate
+        for i, chat in enumerate(self.messages): # Use the message index for the y-coordinate
             self.game.addstr(
                 i + 1,
                 2,

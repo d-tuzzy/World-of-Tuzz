@@ -29,11 +29,24 @@ class Server:
     def handle_client(self, messenger: Messenger) -> None:
         """Handle communication with a connected client in its own thread."""
         connection = messenger.connection # Use the connection to identify the client
+        player_name = None
 
         while True:
             message = messenger.receive_message()
 
             if not message: # If the client has disconnected
+                if player_name != None:
+                    del self.player_coords[player_name]
+
+                    self.broadcast_message(
+                        {
+                            "name": player_name,
+                            "type": "leave",
+                            "data": ""
+                        },
+                        sender=connection
+                    ) # Because the player left abruptly, server need to broadcast a leave message to the other clients
+
                 break # Break before broadcasting so the other clients don't get a blank message
 
             if message["type"] == "position": # If a player has sent a position message
@@ -43,6 +56,8 @@ class Server:
                 self.player_coords[name] = position # Store the new position
 
             elif message["type"] == "join": # If a player has sent a join message
+                player_name = message["name"] # Will be used to identify the player if they disconnect abruptly
+
                 # Send existing player positions to the new player
                 for name, position in self.player_coords.items():
                     messenger.send_message(name, "position", position)
