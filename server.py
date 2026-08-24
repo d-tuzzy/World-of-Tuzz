@@ -36,16 +36,7 @@ class Server:
 
             if not message: # If the client has disconnected
                 if player_name != None:
-                    del self.player_coords[player_name]
-
-                    self.broadcast_message(
-                        {
-                            "name": player_name,
-                            "type": "leave",
-                            "data": ""
-                        },
-                        sender=connection
-                    ) # Because the player left abruptly, server need to broadcast a leave message to the other clients
+                    self.remove_player(player_name, connection)
 
                 break # Break before broadcasting so the other clients don't get a blank message
 
@@ -62,15 +53,28 @@ class Server:
                 for name, position in self.player_coords.items():
                     messenger.send_message(name, "position", position)
 
+            elif message["type"] == "leave": # If a player has sent a leave message
+                self.remove_player(message["name"], connection)
+                break
+
             print(message) # FOR TESTING
             self.broadcast_message(message, sender=connection)
 
-            if message["type"] == "leave": # If the client has sent a leave message
-                del self.player_coords[message["name"]] # Remove the player from the list of players
-                break
-
         self.client_messengers.remove(messenger) # Remove the client from the list
         connection.close() # Close the client connection
+
+    def remove_player(self, player_name: str, connection: socket) -> None:
+        """Remove a player and tell the other clients."""
+        del self.player_coords[player_name]
+
+        self.broadcast_message(
+            {
+                "name": player_name,
+                "type": "leave",
+                "data": ""
+            },
+            sender=connection
+        )
 
     def start(self) -> None:
         """Start the server, accept connections, and make threads."""

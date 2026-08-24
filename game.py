@@ -121,24 +121,8 @@ class Game:
         self.game.clear()
         self.game.box() # Draw a box around the window
         self.game.addstr(0, 2, " GAME ") # Add the game title
-
-        # Player coordinates within the screen
-        player_x = self.x - self.camera_x
-        player_y = self.y - self.camera_y
-
-        # Only draw the player if they are visible in the window
-        if 1 <= player_x < self.width - 1:
-            if 1 <= player_y < self.height - 1:
-                self.game.addstr(player_y, player_x, "@")
-
-        for name, position in self.player_coords.items():
-            # Since the player has already been drawn, player_x and player_y are reused for other players
-            player_x = position[0] - self.camera_x
-            player_y = position[1] - self.camera_y
-
-            if 1 <= player_x < self.width - 1:
-                if 1 <= player_y < self.height - 1:
-                    self.game.addstr(player_y, player_x, "#")
+        
+        self.draw_players()
 
         for i, chat in enumerate(self.messages): # Use the message index for the y-coordinate
             self.game.addstr(
@@ -155,6 +139,27 @@ class Game:
             ) # Show the message being typed
 
         self.game.refresh() # Update the game window
+
+    def draw_players(self) -> None:
+        """Draw the player and other players."""
+        assert self.game is not None  # Keeps PyLance happy
+
+        # Player coordinates within the screen
+        player_x = self.x - self.camera_x
+        player_y = self.y - self.camera_y
+
+        # Only draw the player if they are visible
+        if 1 <= player_x < self.width - 1:
+            if 1 <= player_y < self.height - 1:
+                self.game.addstr(player_y, player_x, "@")
+
+        for name, position in self.player_coords.items():
+            player_x = position[0] - self.camera_x
+            player_y = position[1] - self.camera_y
+
+            if 1 <= player_x < self.width - 1:
+                if 1 <= player_y < self.height - 1:
+                    self.game.addstr(player_y, player_x, "#")
 
     def handle_key(self, key: int) -> bool:
         """Handle a key press and return whether the game should continue."""
