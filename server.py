@@ -16,7 +16,7 @@ class Server:
         # Otherwise, we would have to create a new Messenger for each message sent.
         self.client_messengers = []
 
-    def broadcast_message(self, message: dict, sender: socket) -> None:
+    def broadcast_message(self, message: dict, sender: socket | None) -> None:
         """Send a message to every client except the sender."""
         for messenger in self.client_messengers:
             if messenger.connection != sender: # Ignore the sender
@@ -57,15 +57,20 @@ class Server:
                 self.remove_player(message["name"], connection)
                 break
 
+            if message["type"] == "chat":
+                self.broadcast_message(message, sender=None) # Let players see their own chat message
+            else:
+                self.broadcast_message(message, sender=connection)
+
             print(message) # FOR TESTING
-            self.broadcast_message(message, sender=connection)
 
         self.client_messengers.remove(messenger) # Remove the client from the list
         connection.close() # Close the client connection
 
     def remove_player(self, player_name: str, connection: socket) -> None:
         """Remove a player and tell the other clients."""
-        del self.player_coords[player_name]
+        if player_name in self.player_coords:
+            del self.player_coords[player_name]
 
         self.broadcast_message(
             {

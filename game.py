@@ -2,11 +2,19 @@ import curses
 
 from socket import socket
 from threading import Thread
+from textwrap import wrap
 from messenger import Messenger
 
 
 ip = input("IP: ")
-name = input("Name: ")
+
+while True:
+    name = input("Name: ")
+
+    if 1 <= len(name) <= 16:
+        break
+
+    print("Name must be between 1 and 16 characters.")
 
 
 class Game:
@@ -23,6 +31,14 @@ class Game:
         self.messenger = Messenger(self.client)
         self.messages = []
 
+        # Terminal and game windows
+        self.height = 0
+        self.width = 0
+        self.game_width = 0
+        self.chat_width = 0
+        self.game = None
+        self.chat = None
+
         # World
         self.world_width = 300
         self.world_height = 100
@@ -31,7 +47,7 @@ class Game:
         self.x = 0
         self.y = 0
 
-        # Camera position within the world (top-left corner)
+        # Camera position within the world
         self.camera_x = 0
         self.camera_y = 0
 
@@ -41,11 +57,6 @@ class Game:
         # Chat
         self.chat_mode = False
         self.chat_input = ""
-
-        # Terminal and game window
-        self.height = 0
-        self.width = 0
-        self.game = None
 
     def connect(self) -> None:
         """Connect to the server and start receiving messages."""
@@ -64,13 +75,13 @@ class Game:
             if not message:
                 break
 
-            if message["type"] == "position": # If a player has sent a position message
+            if message["type"] == "position":
                 name = message["name"]
                 position = message["data"]
 
                 self.player_coords[name] = position # Store the new position
 
-            elif message["type"] in ("chat", "join"): # If a player has sent a chat or join message
+            elif message["type"] in ("chat", "join"):
                 self.messages.append(message)
 
             elif message["type"] == "leave":
@@ -82,13 +93,29 @@ class Game:
         curses.curs_set(0) # Hide terminal cursor
         self.screen.nodelay(True) # Make getch() non-blocking so the game keeps running
 
+        curses.start_color()
+        curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_BLACK) # Blue text on black background
+        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK) # Yellow text on black background
+
         self.height, self.width = self.screen.getmaxyx() # Get the size of the terminal
+
+        # Split the terminal into a game and chat window (70/30)
+        self.game_width = int(self.width * 0.7)
+        self.chat_width = self.width - self.game_width
+
         self.game = curses.newwin(
             self.height,
-            self.width,
+            self.game_width,
             0,
             0
         ) # Create the game window
+
+        self.chat = curses.newwin(
+            self.height,
+            self.chat_width,
+            0,
+            self.game_width
+        ) # Create the chat window
 
         # Start the player in the middle of the world
         self.x = self.world_width // 2
@@ -97,14 +124,14 @@ class Game:
     def update_camera(self) -> None:
         """Update the camera to follow the player."""
         # Position the camera so the player is in the middle of the screen
-        self.camera_x = self.x - self.width // 2
+        self.camera_x = self.x - self.game_width // 2
         self.camera_y = self.y - self.height // 2
 
         # Keep the camera's X position inside the world
         # The camera cannot go below 0 or beyond the world's right edge
         self.camera_x = max(
             0,
-            min(self.camera_x, self.world_width - self.width)
+            min(self.camera_x, self.world_width - self.game_width)
         )
 
         # Keep the camera's Y position inside the world
@@ -120,25 +147,12 @@ class Game:
         
         self.game.clear()
         self.game.box() # Draw a box around the window
-        self.game.addstr(0, 2, " GAME ") # Add the game title
-        
+        self.game.addstr(0, 2, " GAME ")
+
         self.draw_players()
+        self.draw_chat()
 
-        for i, chat in enumerate(self.messages): # Use the message index for the y-coordinate
-            self.game.addstr(
-                i + 1,
-                2,
-                str(chat)
-            ) # FOR TESTING: Display received messages in the game window
-
-        if self.chat_mode:
-            self.game.addstr(
-                self.height - 2,
-                2,
-                f"> {self.chat_input}"
-            ) # Show the message being typed
-
-        self.game.refresh() # Update the game window
+        self.game.refresh()
 
     def draw_players(self) -> None:
         """Draw the player and other players."""
@@ -149,7 +163,7 @@ class Game:
         player_y = self.y - self.camera_y
 
         # Only draw the player if they are visible
-        if 1 <= player_x < self.width - 1:
+        if 1 <= player_x < self.game_width - 1:
             if 1 <= player_y < self.height - 1:
                 self.game.addstr(player_y, player_x, "@")
 
@@ -157,9 +171,124 @@ class Game:
             player_x = position[0] - self.camera_x
             player_y = position[1] - self.camera_y
 
-            if 1 <= player_x < self.width - 1:
+            if 1 <= player_x < self.game_width - 1:
                 if 1 <= player_y < self.height - 1:
                     self.game.addstr(player_y, player_x, "#")
+
+    def draw_chat(self) -> None:
+        """Draw the chat window, including messages and the player's current input."""
+        assert self.chat is not None
+
+        self.chat.clear()
+        self.chat.box()
+        self.chat.addstr(0, 2, " CHAT ")
+
+        y = 1
+
+        max_width = self.chat_width - 4
+
+        for message in self.messages:
+            if message["type"] == "chat":
+                name = message["name"]
+                text = message["data"]
+
+                if len(f"{name}: {text}") <= max_width:
+
+                    if y < self.height - 2:
+                        # Draw the name separately so that it can be blue and bold
+                        self.chat.addstr(
+                            y,
+                            2,
+                            name,
+                            curses.color_pair(1) | curses.A_BOLD
+                        )
+
+                        # Draw ": message" after the name
+                        self.chat.addstr(
+                            y,
+                            2 + len(name),
+                            f": {text}"
+                        )
+
+                        y += 1
+
+                else:
+                    # Splits the message into smaller strings that are no longer than max_width
+                    lines = wrap(
+                        f"{name}: {text}",
+                        max_width
+                    )
+
+                    for line_number, line in enumerate(lines):
+                        if y >= self.height - 2: # If at the bottom of the chat window
+                            break
+
+                        if line_number == 0: # This line contains the player's name
+                            # Draw the player's name in blue and bold
+                            self.chat.addstr(
+                                y,
+                                2,
+                                name,
+                                curses.color_pair(1) | curses.A_BOLD
+                            )
+                            
+                            self.chat.addstr(
+                                y,
+                                2 + len(name), # Start drawing after the name
+                                line[len(name):] # Take everything in line after the username
+                            )
+
+                        else:
+                            self.chat.addstr(y, 2, line)
+
+                        y += 1
+
+            elif message["type"] == "join":
+                text = f"[SERVER] {message['name']} joined the game."
+
+                lines = wrap(text, max_width) # Split the server message into lines if too long
+
+                for line in lines:
+                    # Draw each line in yellow and bold
+                    self.chat.addstr(
+                        y,
+                        2,
+                        line,
+                        curses.color_pair(2) | curses.A_BOLD
+                    )
+
+                    y += 1
+
+            elif message["type"] == "leave":
+                text = f"[SERVER] {message['name']} left the game."
+
+                lines = wrap(text, max_width) # Split the server message into lines if too long
+
+                for line in lines:
+                    # Draw each line in yellow and bold
+                    self.chat.addstr(
+                        y,
+                        2,
+                        line,
+                        curses.color_pair(2) | curses.A_BOLD
+                    )
+
+                    y += 1
+
+        if self.chat_mode:
+            max_input_width = self.chat_width - 4
+
+            # Trim the input if it is too long to fit
+            chat_input = self.chat_input[:max_input_width - 2] # -2 leaves room for the "> " at the beginning
+
+            # Display the text the player is currently typing
+            self.chat.addstr(
+                self.height - 2,
+                2,
+                f"> {chat_input}"
+            )
+
+        self.chat.refresh()
 
     def handle_key(self, key: int) -> bool:
         """Handle a key press and return whether the game should continue."""
