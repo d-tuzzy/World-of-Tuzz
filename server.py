@@ -72,14 +72,14 @@ class Server:
         if player_name in self.player_coords:
             del self.player_coords[player_name]
 
-        self.broadcast_message(
-            {
-                "name": player_name,
-                "type": "leave",
-                "data": ""
-            },
-            sender=connection
-        )
+        message = {
+            "name": player_name,
+            "type": "leave",
+            "data": ""
+        }
+
+        print(message)
+        self.broadcast_message(message, sender=connection)
 
     def start(self) -> None:
         """Start the server, accept connections, and make threads."""

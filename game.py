@@ -183,112 +183,135 @@ class Game:
         self.chat.box()
         self.chat.addstr(0, 2, " CHAT ")
 
-        y = 1
+        chat_lines = self.get_chat_lines()
+        self.draw_chat_lines(chat_lines)
 
+        if self.chat_mode:
+            self.draw_chat_input()
+
+        self.chat.refresh()
+
+    def get_chat_lines(self) -> list:
+        """Format chat messages into lines that can be displayed."""
         max_width = self.chat_width - 4
+        chat_lines = []
 
         for message in self.messages:
             if message["type"] == "chat":
-                name = message["name"]
-                text = message["data"]
-
-                if len(f"{name}: {text}") <= max_width:
-
-                    if y < self.height - 2:
-                        # Draw the name separately so that it can be blue and bold
-                        self.chat.addstr(
-                            y,
-                            2,
-                            name,
-                            curses.color_pair(1) | curses.A_BOLD
-                        )
-
-                        # Draw ": message" after the name
-                        self.chat.addstr(
-                            y,
-                            2 + len(name),
-                            f": {text}"
-                        )
-
-                        y += 1
-
-                else:
-                    # Splits the message into smaller strings that are no longer than max_width
-                    lines = wrap(
-                        f"{name}: {text}",
-                        max_width
-                    )
-
-                    for line_number, line in enumerate(lines):
-                        if y >= self.height - 2: # If at the bottom of the chat window
-                            break
-
-                        if line_number == 0: # This line contains the player's name
-                            # Draw the player's name in blue and bold
-                            self.chat.addstr(
-                                y,
-                                2,
-                                name,
-                                curses.color_pair(1) | curses.A_BOLD
-                            )
-                            
-                            self.chat.addstr(
-                                y,
-                                2 + len(name), # Start drawing after the name
-                                line[len(name):] # Take everything in line after the username
-                            )
-
-                        else:
-                            self.chat.addstr(y, 2, line)
-
-                        y += 1
+                chat_lines.extend(
+                    self.get_chat_message_lines(message, max_width)
+                )
 
             elif message["type"] == "join":
-                text = f"[SERVER] {message['name']} joined the game."
-
-                lines = wrap(text, max_width) # Split the server message into lines if too long
-
-                for line in lines:
-                    # Draw each line in yellow and bold
-                    self.chat.addstr(
-                        y,
-                        2,
-                        line,
-                        curses.color_pair(2) | curses.A_BOLD
+                chat_lines.extend(
+                    self.get_server_message_lines(
+                        f"[SERVER] {message['name']} joined the game.",
+                        max_width
                     )
-
-                    y += 1
+                )
 
             elif message["type"] == "leave":
-                text = f"[SERVER] {message['name']} left the game."
-
-                lines = wrap(text, max_width) # Split the server message into lines if too long
-
-                for line in lines:
-                    # Draw each line in yellow and bold
-                    self.chat.addstr(
-                        y,
-                        2,
-                        line,
-                        curses.color_pair(2) | curses.A_BOLD
+                chat_lines.extend(
+                    self.get_server_message_lines(
+                        f"[SERVER] {message['name']} left the game.",
+                        max_width
                     )
+                )
 
-                    y += 1
+        return chat_lines[-(self.height - 3):]
 
-        if self.chat_mode:
-            max_input_width = self.chat_width - 4
+    def get_chat_message_lines(self, message: dict, max_width: int) -> list:
+        """Format a chat message into displayable lines."""
+        name = message["name"]
+        data = message["data"]
 
-            # Trim the input if it is too long to fit
-            chat_input = self.chat_input[:max_input_width - 2] # -2 leaves room for the "> " at the beginning
+        if len(f"{name}: {data}") <= max_width:
+            return [
+                ("chat", name, f": {data}")
+            ]
 
-            # Display the text the player is currently typing
-            self.chat.addstr(
-                self.height - 2,
-                2,
-                f"> {chat_input}"
+        # Splits the message into smaller strings that are no longer than max_width
+        lines = wrap(f"{name}: {data}", max_width)
+        chat_lines = []
+
+        for line_number, line in enumerate(lines):
+            if line_number == 0: # This line contains the player's name
+                chat_lines.append(
+                    ("chat", name, line[len(name):])
+                )
+                
+            else:
+                chat_lines.append(
+                    ("normal", None, line)
+                )
+
+        return chat_lines
+
+    def get_server_message_lines(self, text: str, max_width: int) -> list:
+        """Format a server message into displayable lines."""
+        lines = wrap(text, max_width) # Split the server message into lines if too long
+        chat_lines = []
+
+        for line in lines:
+            chat_lines.append(
+                ("server", None, line)
             )
 
-        self.chat.refresh()
+        return chat_lines
+
+    def draw_chat_lines(self, chat_lines: list) -> None:
+        """Draw the chat messages."""
+        assert self.chat is not None
+
+        y = 1
+
+        for line_type, name, text in chat_lines:
+            if line_type == "chat":
+                self.chat.addstr(
+                    y,
+                    2,
+                    name,
+                    curses.color_pair(1) | curses.A_BOLD # Name is blue and bold
+                )
+
+                self.chat.addstr(
+                    y,
+                    2 + len(name), # Rest is white
+                    text
+                )
+
+            elif line_type == "server":
+                self.chat.addstr(
+                    y,
+                    2,
+                    text,
+                    curses.color_pair(2) | curses.A_BOLD # Whole message is yellow and bold
+                )
+
+            else:
+                self.chat.addstr(
+                    y,
+                    2,
+                    text
+                )
+
+            y += 1
+
+    def draw_chat_input(self) -> None:
+        """Draw the player's current chat input."""
+        assert self.chat is not None
+
+        max_input_width = self.chat_width - 4
+
+        # Trim the input if it is too long to fit
+        chat_input = self.chat_input[:max_input_width - 2] # -2 leaves room for the "> " at the beginning
+
+        # Display the text the player is currently typing
+        self.chat.addstr(
+            self.height - 2,
+            2,
+            f"> {chat_input}"
+        )
 
     def handle_key(self, key: int) -> bool:
         """Handle a key press and return whether the game should continue."""
