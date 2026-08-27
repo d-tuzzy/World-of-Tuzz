@@ -10,6 +10,8 @@ class Server:
         """Initialise the Server with a server socket and its connected clients."""
         self.socket = socket()
         self.player_coords = {} # Coordinates of all players
+        self.player_names = {}
+        self.messages = [] # Join, leave, and chat messages
 
         # Each client has a Messenger that stores its connection and buffer.
         # Storing Messengers (instead of just the connections) lets us identify clients while reusing the same Messenger.
@@ -37,34 +39,36 @@ class Server:
             if not message: # If the client has disconnected
                 if player_name != None:
                     self.remove_player(player_name, connection)
-
                 break # Break before broadcasting so the other clients don't get a blank message
 
-            if message["type"] == "position": # If a player has sent a position message
-                name = message["name"]
-                position = message["data"]
+            if message["type"] in ("chat", "join", "leave"):
+                self.messages.append(message) # Store the message for the server UI
 
-                self.player_coords[name] = position # Store the new position
+            match message["type"]:
+                case "position":
+                    name = message["name"]
+                    position = message["data"]
+                    self.player_coords[name] = position
 
-            elif message["type"] == "join": # If a player has sent a join message
-                player_name = message["name"] # Will be used to identify the player if they disconnect abruptly
+                case "join":
+                    player_name = message["name"] # Will be used to identify the player if they disconnect abruptly
+                    self.player_names[messenger] = player_name # Store the player name for the server UI
 
-                # Send existing player positions to the new player
-                for name, position in self.player_coords.items():
-                    messenger.send_message(name, "position", position)
+                    # Send existing player positions to the new player
+                    for name, position in self.player_coords.items():
+                        messenger.send_message(name, "position", position)
 
-            elif message["type"] == "leave": # If a player has sent a leave message
-                self.remove_player(message["name"], connection)
-                break
+                    self.broadcast_message(message, sender=connection)
 
-            if message["type"] == "chat":
-                self.broadcast_message(message, sender=None) # Let players see their own chat message
-            else:
-                self.broadcast_message(message, sender=connection)
+                case "leave":
+                    self.remove_player(message["name"], connection)
+                    break
 
-            print(message) # FOR TESTING
+                case "chat":
+                    self.broadcast_message(message, sender=None) # Let players see their own chat message
 
-        self.client_messengers.remove(messenger) # Remove the client from the list
+        self.player_names.pop(messenger, None) # Remove the client's name
+        self.client_messengers.remove(messenger) # Remove the client's messenger
         connection.close() # Close the client connection
 
     def remove_player(self, player_name: str, connection: socket) -> None:

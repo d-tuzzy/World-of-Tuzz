@@ -103,19 +103,21 @@ class Game:
         self.game_width = int(self.width * 0.7)
         self.chat_width = self.width - self.game_width
 
+        # Create the game window
         self.game = curses.newwin(
             self.height,
             self.game_width,
             0,
             0
-        ) # Create the game window
+        )
 
+        # Create the chat window
         self.chat = curses.newwin(
             self.height,
             self.chat_width,
             0,
             self.game_width
-        ) # Create the chat window
+        )
 
         # Start the player in the middle of the world
         self.x = self.world_width // 2
@@ -239,7 +241,7 @@ class Game:
                 chat_lines.append(
                     ("chat", name, line[len(name):])
                 )
-                
+
             else:
                 chat_lines.append(
                     ("normal", None, line)
@@ -262,7 +264,6 @@ class Game:
     def draw_chat_lines(self, chat_lines: list) -> None:
         """Draw the chat messages."""
         assert self.chat is not None
-
         y = 1
 
         for line_type, name, text in chat_lines:
